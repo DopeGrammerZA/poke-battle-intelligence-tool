@@ -1,0 +1,5 @@
+{
+  "name": "Poké Battle Intelligence Tool",
+  "description": "A production-quality data exploration tool using the PokéAPI. Browse, compare, and analyze Pokémon stats and battle readiness.",
+  "requestFramePermissions": []
+}

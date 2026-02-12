@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Poké Battle Intelligence Tool</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --normal: #A8A77A; --fire: #EE8130; --water: #6390F0;
+      --electric: #F7D02C; --grass: #7AC74C; --ice: #96D9D6;
+      --fighting: #C22E28; --poison: #A33EA1; --ground: #E2BF65;
+      --flying: #A98FF3; --psychic: #F95587; --bug: #A6B91A;
+      --rock: #B6A136; --ghost: #735797; --dragon: #6F35FC;
+      --dark: #705746; --steel: #B7B7CE; --fairy: #D685AD;
+    }
+    html, body {
+      font-family: 'Inter', sans-serif;
+    }
+    .type-bg-fire { background-color: var(--fire); }
+    .type-text-fire { color: var(--fire); }
+    .type-bg-water { background-color: var(--water); }
+    .type-text-water { color: var(--water); }
+    /* Add all other type classes as needed */
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "rxjs": "https://esm.sh/rxjs@^7.8.2?conditions=es2015",
+    "rxjs/operators": "https://esm.sh/rxjs@^7.8.2/operators?conditions=es2015",
+    "rxjs/ajax": "https://esm.sh/rxjs@^7.8.2/ajax?conditions=es2015",
+    "rxjs/webSocket": "https://esm.sh/rxjs@^7.8.2/webSocket?conditions=es2015",
+    "rxjs/testing": "https://esm.sh/rxjs@^7.8.2/testing?conditions=es2015",
+    "rxjs/fetch": "https://esm.sh/rxjs@^7.8.2/fetch?conditions=es2015",
+    "@angular/platform-browser/animations/async": "https://esm.sh/@angular/platform-browser@^21.1.4/animations/async?external=rxjs",
+    "@angular/platform-browser": "https://esm.sh/@angular/platform-browser@^21.1.4?external=rxjs",
+    "@angular/common/http": "https://esm.sh/@angular/common@^21.1.4/http?external=rxjs",
+    "@angular/core": "https://esm.sh/@angular/core@^21.1.4?external=rxjs",
+    "@angular/router": "https://esm.sh/@angular/router@^21.1.4?external=rxjs",
+    "@angular/compiler": "https://esm.sh/@angular/compiler@^21.1.4?external=rxjs",
+    "lucide-angular": "https://esm.sh/lucide-angular@^0.563.0?external=rxjs"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-slate-900 text-slate-200">
+  <app-root></app-root>
+</body>
+</html>
