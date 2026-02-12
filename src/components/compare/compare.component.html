@@ -1,0 +1,140 @@
+<div class="flex flex-col gap-8">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <!-- Pokemon 1 Selector -->
+    <div class="flex flex-col gap-4">
+      <label for="pokemon1-search" class="text-lg font-semibold">Pokémon 1</label>
+      <input type="text" id="pokemon1-search" (input)="onSearch($event, 1)" [value]="pokemon1Query()" placeholder="Search or use arrows below" class="w-full pl-4 pr-4 py-3 bg-slate-highlight border border-slate-700 rounded-lg focus:ring-2 focus:ring-neon-mint focus:outline-none transition-shadow" aria-label="Search for first Pokémon to compare">
+    </div>
+    <!-- Pokemon 2 Selector -->
+    <div class="flex flex-col gap-4">
+      <label for="pokemon2-search" class="text-lg font-semibold">Pokémon 2</label>
+      <input type="text" id="pokemon2-search" (input)="onSearch($event, 2)" [value]="pokemon2Query()" placeholder="Search or use arrows below" class="w-full pl-4 pr-4 py-3 bg-slate-highlight border border-slate-700 rounded-lg focus:ring-2 focus:ring-neon-mint focus:outline-none transition-shadow" aria-label="Search for second Pokémon to compare">
+    </div>
+  </div>
+
+  @if (store.comparisonError(); as error) {
+    <div class="text-center py-4 bg-red-900/50 border border-red-700 rounded-lg">
+      <p class="text-xl text-red-300">{{ error }}</p>
+    </div>
+  }
+
+  @let pair = store.comparisonPair();
+  @let loading = store.loadingComparison();
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+    <!-- Pokemon 1 Card -->
+    <div class="bg-slate-highlight/50 backdrop-blur-md border border-white/10 rounded-xl p-6 min-h-[300px] flex items-center justify-center">
+       <div class="flex items-center justify-between w-full">
+        <!-- Prev Button -->
+        <button (click)="changePokemon(1, 'prev')" class="p-2 rounded-full text-gray-400 hover:text-white hover:bg-slate-700 transition-colors" aria-label="Select previous Pokémon for slot 1">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <!-- Pokemon Display Area -->
+        <div class="flex-grow min-w-0 px-2">
+           @if(loading.slot1) {
+            <div class="text-center text-gray-400 animate-pulse">Searching...</div>
+          } @else if(pair.pokemon1; as p1) {
+            <div class="text-center">
+              <button (click)="clearPokemon(1)" class="float-right -mt-4 -mr-2 text-gray-400 hover:text-white text-2xl" aria-label="Clear first Pokémon">&times;</button>
+              <img [src]="p1.sprites.other['official-artwork'].front_default" [alt]="p1.name" class="w-32 h-32 mx-auto drop-shadow-[0_5px_15px_rgba(57,255,20,0.3)]">
+              <h2 class="text-2xl font-bold capitalize mt-4 truncate">{{ p1.name }}</h2>
+              <div class="flex justify-center gap-2 mt-2">
+                @for(type of p1.types; track type.slot) {
+                  <span class="px-3 py-1 text-xs font-bold rounded-full" [class]="getTypeColor(type.type.name)">{{ type.type.name | uppercase }}</span>
+                }
+              </div>
+            </div>
+          } @else {
+            <div class="text-center text-gray-400">Select Pokémon 1</div>
+          }
+        </div>
+        <!-- Next Button -->
+        <button (click)="changePokemon(1, 'next')" class="p-2 rounded-full text-gray-400 hover:text-white hover:bg-slate-700 transition-colors" aria-label="Select next Pokémon for slot 1">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+    </div>
+    <!-- Pokemon 2 Card -->
+     <div class="bg-slate-highlight/50 backdrop-blur-md border border-white/10 rounded-xl p-6 min-h-[300px] flex items-center justify-center">
+       <div class="flex items-center justify-between w-full">
+        <!-- Prev Button -->
+        <button (click)="changePokemon(2, 'prev')" class="p-2 rounded-full text-gray-400 hover:text-white hover:bg-slate-700 transition-colors" aria-label="Select previous Pokémon for slot 2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <!-- Pokemon Display Area -->
+        <div class="flex-grow min-w-0 px-2">
+           @if(loading.slot2) {
+            <div class="text-center text-gray-400 animate-pulse">Searching...</div>
+          } @else if(pair.pokemon2; as p2) {
+            <div class="text-center">
+              <button (click)="clearPokemon(2)" class="float-right -mt-4 -mr-2 text-gray-400 hover:text-white text-2xl" aria-label="Clear second Pokémon">&times;</button>
+              <img [src]="p2.sprites.other['official-artwork'].front_default" [alt]="p2.name" class="w-32 h-32 mx-auto drop-shadow-[0_5px_15px_rgba(57,255,20,0.3)]">
+              <h2 class="text-2xl font-bold capitalize mt-4 truncate">{{ p2.name }}</h2>
+              <div class="flex justify-center gap-2 mt-2">
+                @for(type of p2.types; track type.slot) {
+                  <span class="px-3 py-1 text-xs font-bold rounded-full" [class]="getTypeColor(type.type.name)">{{ type.type.name | uppercase }}</span>
+                }
+              </div>
+            </div>
+          } @else {
+            <div class="text-center text-gray-400">Select Pokémon 2</div>
+          }
+        </div>
+        <!-- Next Button -->
+        <button (click)="changePokemon(2, 'next')" class="p-2 rounded-full text-gray-400 hover:text-white hover:bg-slate-700 transition-colors" aria-label="Select next Pokémon for slot 2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prediction & Stats -->
+  @if (winnerPrediction(); as prediction) {
+    <div class="bg-slate-900/70 backdrop-blur-md border border-neon-mint/30 rounded-xl p-8 mt-8">
+      <h2 class="text-3xl font-bold text-center mb-6 text-neon-mint">Battle Prediction</h2>
+      <div class="text-center">
+        @if(prediction.draw) {
+          <p class="text-2xl font-semibold">Result: DRAW</p>
+        } @else if(prediction.winner; as winner) {
+          <p class="text-2xl font-semibold">Predicted Winner: <span class="capitalize">{{ winner.name }}</span></p>
+          <img [src]="winner.sprites.front_default" [alt]="winner.name" class="w-24 h-24 mx-auto my-4">
+        }
+        <p class="text-gray-300 max-w-2xl mx-auto">{{ prediction.explanation }}</p>
+      </div>
+
+      <div class="mt-8">
+        <h3 class="text-xl font-bold text-center mb-4">Stat Comparison</h3>
+        <div class="space-y-3 max-w-3xl mx-auto">
+          @for (statName of ['hp', 'attack', 'defense', 'speed']; track statName) {
+            @if(pair.pokemon1 && pair.pokemon2) {
+              @let p1Stat = getStatValue(pair.pokemon1, statName);
+              @let p2Stat = getStatValue(pair.pokemon2, statName);
+              <div class="grid grid-cols-3 items-center gap-4 text-sm">
+                <div class="text-right">
+                  <span class="font-bold">{{ p1Stat }}</span>
+                </div>
+                <div class="text-center font-semibold capitalize text-gray-400">{{ statName }}</div>
+                <div>
+                  <span class="font-bold">{{ p2Stat }}</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                <div class="w-full bg-slate-700 rounded-full h-3" dir="rtl">
+                  <div class="bg-blue-500 h-3 rounded-full" [style.width.%]="(p1Stat / 255) * 100"></div>
+                </div>
+                 <div class="w-4"></div>
+                <div class="w-full bg-slate-700 rounded-full h-3">
+                  <div class="bg-red-500 h-3 rounded-full" [style.width.%]="(p2Stat / 255) * 100"></div>
+                </div>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    </div>
+  } @else if (pair.pokemon1 && pair.pokemon2) {
+    <div class="text-center py-8">
+      <p class="text-lg text-gray-400">Ready to predict the winner!</p>
+    </div>
+  }
+</div>

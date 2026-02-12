@@ -1,41 +1,14 @@
 import { Routes } from '@angular/router';
+import { PokemonListComponent } from './components/pokemon-list/pokemon-list.component';
+import { PokemonDetailComponent } from './components/pokemon-detail/pokemon-detail.component';
+import { CompareComponent } from './components/compare/compare.component';
+import { TypeExplorerComponent } from './components/type-explorer/type-explorer.component';
 
-export const routes: Routes = [
-  {
-    path: 'pokedex',
-    loadComponent: () =>
-      import('./features/pokemon-list/pokemon-list.component').then(
-        (m) => m.PokemonListComponent
-      ),
-  },
-  {
-    path: 'pokedex/:id',
-    loadComponent: () =>
-      import('./features/pokemon-detail/pokemon-detail.component').then(
-        (m) => m.PokemonDetailComponent
-      ),
-  },
-  {
-    path: 'compare',
-    loadComponent: () =>
-      import('./features/compare/compare.component').then(
-        (m) => m.CompareComponent
-      ),
-  },
-  {
-    path: 'types',
-    loadComponent: () =>
-      import('./features/type-explorer/type-explorer.component').then(
-        (m) => m.TypeExplorerComponent
-      ),
-  },
-  {
-    path: '',
-    redirectTo: '/pokedex',
-    pathMatch: 'full',
-  },
-  {
-    path: '**',
-    redirectTo: '/pokedex',
-  },
+export const APP_ROUTES: Routes = [
+  { path: '', redirectTo: 'pokemon', pathMatch: 'full' },
+  { path: 'pokemon', component: PokemonListComponent, title: 'Pokémon List' },
+  { path: 'pokemon/:name', component: PokemonDetailComponent, title: 'Pokémon Details' },
+  { path: 'compare', component: CompareComponent, title: 'Compare Pokémon' },
+  { path: 'types', component: TypeExplorerComponent, title: 'Type Explorer' },
+  { path: '**', redirectTo: 'pokemon' } 
 ];

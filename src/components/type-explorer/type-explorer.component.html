@@ -1,0 +1,69 @@
+<div class="flex flex-col gap-8">
+  <div>
+    <label for="type-select" class="block text-sm font-medium text-gray-300 mb-2">Select a Pokémon Type</label>
+    <select id="type-select" (change)="onTypeChange($event)" class="bg-slate-highlight border border-slate-700 text-white text-sm rounded-lg focus:ring-neon-mint focus:border-neon-mint block w-full p-2.5">
+      <option value="">-- Choose a type --</option>
+      @for (type of store.allTypes(); track type.name) {
+        <option [value]="type.name" [selected]="type.name === selectedTypeName()">{{ type.name | titlecase }}</option>
+      }
+    </select>
+  </div>
+
+  @if (store.selectedType(); as typeDetails) {
+    <div class="bg-slate-highlight/50 backdrop-blur-md border border-white/10 rounded-xl p-8">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+            <h1 class="text-4xl font-bold capitalize mb-4 md:mb-0" [class]="getTypeColor(typeDetails.name) + ' px-4 py-2 rounded-lg bg-opacity-20 border-2'">
+                {{ typeDetails.name }} Type
+            </h1>
+            <button (click)="findApexPokemon(typeDetails.pokemon)" class="bg-neon-mint text-slate-deep font-bold py-2 px-6 rounded-lg hover:bg-opacity-80 transition-colors" aria-label="Find the apex Pokémon for this type" [disabled]="isFindingApex()">
+                @if (isFindingApex()) {
+                  <span>Searching...</span>
+                } @else {
+                  <span>Find Apex Pokémon</span>
+                }
+            </button>
+        </div>
+
+        @if (apexPokemon(); as apex) {
+             <div class="bg-slate-900/70 border border-neon-mint/30 rounded-lg p-6 mb-8 text-center">
+                 <h2 class="text-2xl font-bold text-neon-mint mb-2">Apex Pokémon</h2>
+                 <p class="text-gray-400 mb-4">The strongest Pokémon of this type based on total stats.</p>
+                 <a [routerLink]="['/pokemon', apex.name]" class="inline-block group" [attr.aria-label]="'View details for ' + apex.name">
+                     <img [src]="apex.sprites.other['official-artwork'].front_default" [alt]="apex.name" class="w-32 h-32 mx-auto drop-shadow-[0_5px_15px_rgba(57,255,20,0.5)] transition-transform group-hover:scale-110">
+                     <p class="text-xl font-bold capitalize mt-2 group-hover:text-neon-mint transition-colors">{{ apex.name }}</p>
+                     <p class="text-gray-300">Total Stats: <span class="font-mono">{{ apex.totalStats }}</span></p>
+                 </a>
+             </div>
+        } @else if(isFindingApex()) {
+            <div class="text-center p-6 mb-8">
+                <p class="animate-pulse">Searching for the Apex Pokémon...</p>
+            </div>
+        } @else if (findApexError(); as error) {
+            <div class="text-center p-6 mb-8 bg-red-900/50 border border-red-700 rounded-lg">
+                <p class="text-red-300">Error finding Apex Pokémon: {{ error }}</p>
+            </div>
+        }
+
+      <h2 class="text-2xl font-bold mb-4">Pokémon of this Type</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        @for (p of typeDetails.pokemon; track p.pokemon.name; let i = $index) {
+          @if (i < 50) { <!-- Limit to first 50 for performance -->
+            @let pokemonId = getPokemonId(p.pokemon.url);
+            <a [routerLink]="['/pokemon', p.pokemon.name]" class="group bg-slate-highlight/50 border border-transparent hover:border-neon-mint/50 rounded-lg p-4 flex flex-col items-center justify-center aspect-square transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-neon-mint/10" [attr.aria-label]="'View details for ' + p.pokemon.name">
+              <img [src]="'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/' + pokemonId + '.png'" [alt]="p.pokemon.name" class="w-20 h-20 object-contain transition-transform duration-300 group-hover:scale-110" loading="lazy" width="80" height="80">
+              <p class="mt-2 text-center text-sm font-semibold capitalize text-gray-300 group-hover:text-neon-mint transition-colors">{{ p.pokemon.name }}</p>
+            </a>
+          }
+        }
+      </div>
+    </div>
+  } @else if (store.loading()) {
+      <div class="text-center py-20 bg-slate-highlight/50 rounded-lg">
+          <div class="animate-pulse">Loading type data...</div>
+      </div>
+  } @else {
+    <div class="text-center py-20 bg-slate-highlight/50 rounded-lg">
+      <p class="text-xl text-gray-400">Please select a type to begin exploring.</p>
+    </div>
+  }
+</div>
