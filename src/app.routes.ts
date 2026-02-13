@@ -7,7 +7,7 @@ import { TypeExplorerComponent } from './components/type-explorer/type-explorer.
 export const APP_ROUTES: Routes = [
   { path: '', redirectTo: 'pokemon', pathMatch: 'full' },
   { path: 'pokemon', component: PokemonListComponent, title: 'Pokémon List' },
-  { path: 'pokemon/:name', component: PokemonDetailComponent, title: 'Pokémon Details' },
+  { path: 'pokemon/:id', component: PokemonDetailComponent, title: 'Pokémon Details' },
   { path: 'compare', component: CompareComponent, title: 'Compare Pokémon' },
   { path: 'types', component: TypeExplorerComponent, title: 'Type Explorer' },
   { path: '**', redirectTo: 'pokemon' } 

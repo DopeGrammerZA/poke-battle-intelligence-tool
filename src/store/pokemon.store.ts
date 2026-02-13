@@ -7,7 +7,7 @@ import { catchError, finalize } from 'rxjs/operators';
 // State interface
 interface PokemonState {
   pokemonList: PokemonListItem[];
-  filteredPokemon: PokemonListItem[];
+  // REMOVED: filteredPokemon - This is derived state and should not be part of the core state.
   selectedPokemon: Pokemon | null;
   comparisonPair: ComparisonPair;
   allTypes: {name: string, url: string}[];
@@ -18,12 +18,13 @@ interface PokemonState {
   comparisonError: string | null;
   searchTerm: string;
   viewMode: 'grid' | 'list';
+  currentPage: number;
 }
 
 // Initial state
 const initialState: PokemonState = {
   pokemonList: [],
-  filteredPokemon: [],
+  // REMOVED: filteredPokemon - It is now purely a computed signal.
   selectedPokemon: null,
   comparisonPair: { pokemon1: null, pokemon2: null },
   allTypes: [],
@@ -34,6 +35,7 @@ const initialState: PokemonState = {
   comparisonError: null,
   searchTerm: '',
   viewMode: 'grid',
+  currentPage: 1,
 };
 
 @Injectable({
@@ -41,6 +43,7 @@ const initialState: PokemonState = {
 })
 export class PokemonStore {
   private pokemonService = inject(PokemonService);
+  private readonly itemsPerPage = 30;
   
   // State Signals
   private state = {
@@ -55,6 +58,7 @@ export class PokemonStore {
     comparisonError: signal<string | null>(initialState.comparisonError),
     searchTerm: signal<string>(initialState.searchTerm),
     viewMode: signal<'grid' | 'list'>(initialState.viewMode),
+    currentPage: signal<number>(initialState.currentPage),
   };
 
   // Selectors (public computed signals)
@@ -69,6 +73,7 @@ export class PokemonStore {
   readonly comparisonError = this.state.comparisonError.asReadonly();
   readonly searchTerm = this.state.searchTerm.asReadonly();
   readonly viewMode = this.state.viewMode.asReadonly();
+  readonly currentPage = this.state.currentPage.asReadonly();
   
   readonly filteredPokemon = computed(() => {
     const term = this.state.searchTerm().toLowerCase();
@@ -78,41 +83,69 @@ export class PokemonStore {
     return this.state.pokemonList().filter(p => p.name.toLowerCase().includes(term));
   });
 
+  readonly totalPages = computed(() => {
+    // Total pages should be based on the list that can be paginated.
+    return Math.ceil(this.filteredPokemon().length / this.itemsPerPage);
+  });
+
+  readonly pokemonToDisplay = computed(() => {
+    const listToDisplay = this.filteredPokemon();
+
+    // Always paginate the list, whether it's filtered by search or not.
+    const page = this.currentPage();
+    const start = (page - 1) * this.itemsPerPage;
+    const end = start + this.itemsPerPage;
+    return listToDisplay.slice(start, end);
+  });
+
   constructor() {
     this.loadInitialPokemon();
     this.loadAllTypes();
   }
   
   // Methods to update state
-  private loadInitialPokemon(): void {
+  loadInitialPokemon(): void {
     this.state.loading.set(true);
-    this.pokemonService.getPokemonList(151).subscribe({
+    this.state.error.set(null);
+    // Fetch a large list to enable full client-side search
+    this.pokemonService.getPokemonList(1302).subscribe({
       next: (response) => {
-        this.state.pokemonList.set(response.results);
-        this.state.error.set(null);
+        // Filter out Pokémon with IDs >= 10000, as they are alternate forms with potentially broken API endpoints.
+        const filteredResults = response.results.filter(p => {
+            const urlParts = p.url.split('/');
+            const id = parseInt(urlParts[urlParts.length - 2], 10);
+            return id < 10000;
+        });
+        this.state.pokemonList.set(filteredResults);
       },
       error: (err) => this.state.error.set(err.message),
       complete: () => this.state.loading.set(false),
     });
   }
 
-  loadPokemonDetails(name: string): void {
+  loadPokemonDetails(nameOrId: string): void {
     this.state.loading.set(true);
-    // Do not clear selectedPokemon here to allow smooth transitions in list view
-    this.pokemonService.getPokemonDetails(name).subscribe({
+    this.state.error.set(null);
+    this.pokemonService.getPokemonDetails(nameOrId).subscribe({
       next: (pokemon) => {
         this.state.selectedPokemon.set(pokemon);
-        this.state.error.set(null);
       },
-      error: (err) => this.state.error.set(err.message),
+      error: (err) => {
+        // Clear selected pokemon on error to prevent showing stale data
+        this.state.selectedPokemon.set(null);
+        this.state.error.set(err.message);
+      },
       complete: () => this.state.loading.set(false),
     });
   }
 
-  private loadAllTypes(): void {
+  loadAllTypes(): void {
+    this.state.loading.set(true);
+    this.state.error.set(null);
     this.pokemonService.getAllTypes().subscribe({
       next: (types) => this.state.allTypes.set(types),
       error: (err) => this.state.error.set(err.message),
+      complete: () => this.state.loading.set(false),
     });
   }
 
@@ -122,10 +155,10 @@ export class PokemonStore {
         return;
     }
     this.state.loading.set(true);
+    this.state.error.set(null);
     this.pokemonService.getTypeDetails(typeName).subscribe({
         next: (typeDetails) => {
             this.state.selectedType.set(typeDetails);
-            this.state.error.set(null);
         },
         error: (err) => this.state.error.set(err.message),
         complete: () => this.state.loading.set(false)
@@ -134,13 +167,12 @@ export class PokemonStore {
 
   setSearchTerm(term: string): void {
     this.state.searchTerm.set(term);
+    this.state.currentPage.set(1); // Reset to first page on new search
   }
   
   setViewMode(mode: 'grid' | 'list'): void {
     this.state.viewMode.set(mode);
-    if (mode === 'grid') {
-      this.state.selectedPokemon.set(null);
-    }
+    this.state.selectedPokemon.set(null); // Clear on any view mode change for clean state
   }
 
   setPokemonForComparison(pokemonName: string, slot: 1 | 2): void {
@@ -173,5 +205,22 @@ export class PokemonStore {
       this.state.comparisonPair.update(pair => {
           return slot === 1 ? { ...pair, pokemon1: null } : { ...pair, pokemon2: null };
       });
+  }
+
+  // Pagination methods
+  goToPage(page: number): void {
+    const total = this.totalPages();
+    if (page >= 1 && page <= total) {
+      this.state.currentPage.set(page);
+      window.scrollTo(0, 0);
+    }
+  }
+
+  nextPage(): void {
+    this.goToPage(this.currentPage() + 1);
+  }
+
+  previousPage(): void {
+    this.goToPage(this.currentPage() - 1);
   }
 }

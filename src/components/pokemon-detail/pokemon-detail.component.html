@@ -22,7 +22,7 @@
   <div class="flex flex-col md:flex-row gap-8">
     <!-- Left Panel: Image and Basic Info -->
     <div class="md:w-1/3 bg-slate-highlight/50 backdrop-blur-md border border-white/10 rounded-xl p-8 flex flex-col items-center text-center">
-      <img [src]="pokemon.sprites.other['official-artwork'].front_default" [alt]="pokemon.name" class="w-48 h-48 drop-shadow-[0_5px_15px_rgba(57,255,20,0.3)]">
+      <img [src]="pokemon.sprites.other['official-artwork'].front_default" [alt]="pokemon.name" class="w-48 h-48 drop-shadow-[0_5px_15px_rgba(57,255,20,0.3)]" (error)="onImageError($event)">
       <h1 class="text-4xl font-bold capitalize mt-4">{{ pokemon.name }}</h1>
       <p class="text-gray-400">#{{ pokemon.id.toString().padStart(3, '0') }}</p>
       <div class="flex gap-2 mt-4">
@@ -86,7 +86,10 @@
   </div>
 } @else if(store.error()) {
     <div class="text-center py-12 bg-red-900/50 border border-red-700 rounded-lg">
-      <p class="text-xl text-red-300">Error: {{ store.error() }}</p>
-      <a routerLink="/pokemon" class="mt-4 inline-block bg-neon-mint text-slate-deep font-bold py-2 px-4 rounded-lg hover:bg-opacity-80 transition-colors" aria-label="Go back to the Pokémon list">Go Back</a>
+      <p class="text-xl text-red-300 mb-4">Error: {{ store.error() }}</p>
+      <div class="flex justify-center gap-4 mt-6">
+        <button (click)="retryLoad()" class="bg-neon-mint text-slate-deep font-bold py-2 px-4 rounded-lg hover:bg-opacity-80 transition-colors" aria-label="Retry loading Pokémon details">Retry</button>
+        <a routerLink="/pokemon" class="bg-slate-highlight border border-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-700 transition-colors" aria-label="Go back to the Pokémon list">Go Back</a>
+      </div>
     </div>
 }

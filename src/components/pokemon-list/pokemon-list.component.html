@@ -2,6 +2,8 @@
   <div class="flex flex-col sm:flex-row gap-4 justify-between items-center">
     <div class="relative flex-grow w-full">
       <input 
+        #searchInput
+        id="pokemon-list-search"
         type="text" 
         placeholder="Search Pokémon (e.g., Pikachu)..."
         (input)="onSearch($event)"
@@ -15,23 +17,27 @@
     </div>
     <!-- View Toggle Buttons -->
     <div class="flex-shrink-0 flex items-center bg-slate-highlight border border-slate-700 rounded-lg p-1">
-      <button (click)="setViewMode('grid')" 
+      <button #gridButton
+              id="grid-view-button"
+              (click)="setViewMode('grid')" 
               [class]="store.viewMode() === 'grid' ? 'bg-slate-700 text-neon-mint' : 'text-gray-400 hover:bg-slate-800'"
-              class="p-2 rounded-md transition-colors"
+              class="p-2 rounded-md transition-colors focus:ring-2 focus:ring-neon-mint focus:outline-none"
               aria-label="Switch to grid view">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
       </button>
-      <button (click)="setViewMode('list')" 
+      <button #listButton
+              id="list-view-button"
+              (click)="setViewMode('list')" 
               [class]="store.viewMode() === 'list' ? 'bg-slate-700 text-neon-mint' : 'text-gray-400 hover:bg-slate-800'"
-              class="p-2 rounded-md transition-colors"
+              class="p-2 rounded-md transition-colors focus:ring-2 focus:ring-neon-mint focus:outline-none"
               aria-label="Switch to list view">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
       </button>
     </div>
   </div>
 
-  @if (store.loading() && store.filteredPokemon().length === 0) {
-    <!-- SKELETON (same for both views is fine) -->
+  @if (store.loading() && store.pokemonToDisplay().length === 0 && store.viewMode() === 'grid') {
+    <!-- SKELETON (only for initial grid load) -->
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
       @for (item of [1,2,3,4,5,6,7,8,9,10,11,12]; track item) {
         <div class="animate-pulse-slow bg-slate-highlight/50 rounded-lg p-4 flex flex-col items-center justify-center aspect-square">
@@ -42,15 +48,18 @@
     </div>
   } @else if (store.error()) {
     <div class="text-center py-12 bg-red-900/50 border border-red-700 rounded-lg">
-      <p class="text-xl text-red-300">Error: {{ store.error() }}</p>
+      <p class="text-xl text-red-300 mb-4">Error: {{ store.error() }}</p>
+      <button (click)="retryLoad()" class="bg-neon-mint text-slate-deep font-bold py-2 px-6 rounded-lg hover:bg-opacity-80 transition-colors" aria-label="Retry loading Pokémon list">
+        Retry
+      </button>
     </div>
   } @else {
-    <!-- GRID VIEW -->
     @if (store.viewMode() === 'grid') {
+      <!-- GRID VIEW -->
       <div #gridContainer class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4" (mousemove)="onMouseMove()">
-        @for (pokemon of store.filteredPokemon(); track pokemon.name; let i = $index) {
+        @for (pokemon of store.pokemonToDisplay(); track pokemon.name; let i = $index) {
           @let pokemonId = getPokemonId(pokemon.url);
-          <a [routerLink]="['/pokemon', pokemon.name]" 
+          <a [routerLink]="['/pokemon', pokemonId]" 
              [id]="'pokemon-item-' + i"
              [class]="isKeyboardNavActive() && activeIndex() === i ? 'ring-2 ring-neon-mint ring-offset-2 ring-offset-slate-deep' : 'border-transparent'"
              class="group bg-slate-highlight/50 border hover:border-neon-mint/50 rounded-lg p-4 flex flex-col items-center justify-center aspect-square transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-neon-mint/10 focus:outline-none"
@@ -62,6 +71,7 @@
               loading="lazy"
               width="96"
               height="96"
+              (error)="onImageError($event)"
             >
             <p class="mt-2 text-center font-semibold capitalize text-gray-300 group-hover:text-neon-mint transition-colors">
               {{ pokemon.name }}
@@ -73,92 +83,118 @@
           </div>
         }
       </div>
+
+      <!-- PAGINATION CONTROLS -->
+      @if (store.totalPages() > 1) {
+        <div id="pagination-controls" class="flex justify-center items-center gap-1 sm:gap-2 mt-8 text-sm">
+          <button (click)="store.previousPage()" [disabled]="store.currentPage() === 1"
+                  class="px-3 py-2 bg-slate-highlight border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-neon-mint"
+                  aria-label="Go to previous page">
+            &larr; Prev
+          </button>
+
+          @for(page of paginationRange(); track $index) {
+            @if (page === '...') {
+              <span class="px-2 sm:px-3 py-2 text-gray-400">...</span>
+            } @else {
+              <button (click)="store.goToPage(page)"
+                      [class]="store.currentPage() === page ? 'bg-neon-mint text-slate-deep font-bold' : 'bg-slate-highlight border border-slate-700 hover:bg-slate-700'"
+                      class="w-10 h-10 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-neon-mint"
+                      [attr.aria-label]="'Go to page ' + page">
+                {{ page }}
+              </button>
+            }
+          }
+
+          <button (click)="store.nextPage()" [disabled]="store.currentPage() === store.totalPages()"
+                  class="px-3 py-2 bg-slate-highlight border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-neon-mint"
+                  aria-label="Go to next page">
+            Next &rarr;
+          </button>
+        </div>
+      }
     } @else {
-      <!-- LIST + DETAIL VIEW -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-8" (mousemove)="onMouseMove()">
-        <!-- List Panel -->
-        <div class="md:col-span-1 bg-slate-highlight/50 backdrop-blur-md border border-white/10 rounded-xl p-4 h-[70vh] overflow-y-auto">
-          <ul class="flex flex-col gap-1">
-            @for (pokemon of store.filteredPokemon(); track pokemon.name; let i = $index) {
+      <!-- LIST VIEW -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <!-- Left: Scrollable List -->
+        <div class="md:col-span-1 bg-slate-highlight/50 rounded-lg p-2 max-h-[65vh] md:h-[65vh] md:max-h-none overflow-y-auto relative" (mousemove)="onMouseMove()">
+          <div class="sticky top-0 bg-slate-highlight/80 backdrop-blur-sm z-10 p-2">
+            <input 
+              #listSearchInput
+              id="pokemon-list-internal-search"
+              type="text" 
+              placeholder="Filter list..."
+              (input)="onListSearch($event)"
+              [value]="listSearchTerm()"
+              class="w-full px-4 py-2 bg-slate-deep border border-slate-700 rounded-md focus:ring-2 focus:ring-neon-mint focus:outline-none transition-shadow text-sm"
+              aria-label="Filter the current Pokémon list"
+            >
+          </div>
+          <ul class="space-y-1 mt-2">
+            @for (pokemon of listToRender(); track pokemon.name; let i = $index) {
               <li>
-                <button (click)="selectPokemon(pokemon.name)"
-                        [id]="'pokemon-item-' + i"
-                        class="w-full text-left px-4 py-3 rounded-lg capitalize font-semibold transition-colors flex items-center gap-4 focus:outline-none"
-                        [class]="isKeyboardNavActive() && activeIndex() === i ? 'ring-2 ring-neon-mint ring-offset-2 ring-offset-slate-deep' : (store.selectedPokemon()?.name === pokemon.name ? 'bg-neon-mint/20 text-neon-mint' : 'hover:bg-slate-700/50')"
-                        [attr.aria-label]="'View details for ' + pokemon.name">
-                   @let pokemonId = getPokemonId(pokemon.url);
-                   <img [src]="'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/' + pokemonId + '.png'" [alt]="pokemon.name" class="w-8 h-8" loading="lazy">
-                  <span>{{ pokemon.name }}</span>
+                <button 
+                  (click)="selectPokemon(pokemon)" 
+                  [id]="'pokemon-list-item-' + i"
+                  class="w-full text-left px-4 py-2 rounded-md capitalize transition-colors text-gray-300"
+                  [class]="(selectedListItem()?.name === pokemon.name || (isKeyboardNavActive() && activeIndex() === i)) ? 'bg-neon-mint text-slate-deep font-bold' : 'hover:bg-slate-700'">
+                  {{ pokemon.name }}
                 </button>
               </li>
             } @empty {
-              <li class="p-4 text-center text-gray-400">
-                No Pokémon found.
-              </li>
+               @if (listSearchTerm()) {
+                <li class="p-4 text-center text-gray-400">No results for "{{ listSearchTerm() }}"</li>
+               } @else {
+                <li class="p-4 text-center text-gray-400">No Pokémon found for "{{ store.searchTerm() }}"</li>
+               }
             }
           </ul>
         </div>
-        <!-- Detail Panel -->
-        <div class="md:col-span-2">
-          @if(store.selectedPokemon(); as pokemon) {
-            <div class="bg-slate-highlight/50 backdrop-blur-md border border-white/10 rounded-xl p-8">
-               <div class="flex justify-between items-start">
-                  <div>
-                    <h1 class="text-4xl font-bold capitalize">{{ pokemon.name }}</h1>
-                    <p class="text-gray-400">#{{ pokemon.id.toString().padStart(3, '0') }}</p>
-                  </div>
-                   <div class="flex gap-2 mt-2">
-                    @for (type of pokemon.types; track type.slot) {
-                      <span class="px-3 py-1 text-sm font-bold rounded-full" [class]="getTypeColor(type.type.name)">
-                        {{ type.type.name | uppercase }}
-                      </span>
-                    }
-                  </div>
-               </div>
-              <!-- Battle Readiness Score -->
-              <div class="my-8 text-center bg-slate-900/50 p-6 rounded-lg border border-neon-mint/20">
-                <h3 class="text-lg font-semibold text-gray-300 mb-2">Battle Readiness Score</h3>
-                @let score = battleReadinessScore();
-                <p class="text-6xl font-bold" [class]="getScoreColor(score)">{{ score }}</p>
-                <div class="w-full bg-slate-700 rounded-full h-2.5 mt-4">
-                  <div class="bg-neon-mint h-2.5 rounded-full" [style.width.%]="score"></div>
-                </div>
-                @if(score >= 80) {
-                  <p class="mt-3 text-neon-mint/80 text-sm">S-Tier Combatant</p>
-                }
-              </div>
 
-              <!-- Base Stats -->
-              <h2 class="text-2xl font-bold mb-4">Base Stats</h2>
-              <div class="space-y-3">
-                @for (stat of pokemon.stats; track stat.stat.name) {
-                  <div class="flex items-center gap-4">
-                    <span class="w-1/4 text-sm font-semibold capitalize text-gray-400">{{ stat.stat.name.replace('-', ' ') }}</span>
-                    <div class="w-3/4 flex items-center gap-2">
-                      <span class="font-bold w-8">{{ stat.base_stat }}</span>
-                      <div class="w-full bg-slate-700 rounded-full h-4">
-                        <div class="h-4 rounded-full" [class]="getStatColor(stat.stat.name)" [style.width.%]="getStatPercentage(stat.base_stat)"></div>
-                      </div>
-                    </div>
-                  </div>
-                }
-              </div>
+        <!-- Right: Detail View -->
+        <div class="md:col-span-2">
+          @if(store.loading() && !store.selectedPokemon()) {
+            <div class="flex items-center justify-center bg-slate-highlight/50 rounded-lg p-8 min-h-[400px] md:h-[65vh] animate-pulse">
+                <p class="text-gray-400">Loading details...</p>
             </div>
-          } @else if(store.loading() && store.viewMode() === 'list') {
-            <div class="animate-pulse-slow bg-slate-highlight/50 rounded-lg p-8 h-full">
-              <div class="h-8 w-40 bg-slate-700 rounded mb-8"></div>
-              <div class="h-6 w-32 bg-slate-700 rounded mb-6"></div>
-              @for (item of [1,2,3,4,5,6]; track item) {
-                <div class="flex items-center gap-4 mb-3">
-                  <div class="w-1/4 h-4 bg-slate-700 rounded"></div>
-                  <div class="w-3/4 h-6 bg-slate-700 rounded-full"></div>
-                </div>
-              }
+          } @else if (store.selectedPokemon(); as pokemon) {
+            <div class="bg-slate-highlight/50 backdrop-blur-md border border-white/10 rounded-xl p-6 md:h-[65vh] flex flex-col justify-center">
+              <div class="flex flex-col sm:flex-row gap-6 items-center">
+                  <div class="sm:w-1/3 text-center flex flex-col items-center">
+                      <a [routerLink]="['/pokemon', pokemon.id]" class="block group" [attr.aria-label]="'View full details for ' + pokemon.name">
+                        <img [src]="pokemon.sprites.other['official-artwork'].front_default" [alt]="pokemon.name" class="w-32 h-32 mx-auto drop-shadow-[0_5px_15px_rgba(57,255,20,0.3)] transition-transform group-hover:scale-110" (error)="onImageError($event)">
+                      </a>
+                      <h2 class="text-2xl font-bold capitalize mt-4">{{ pokemon.name }}</h2>
+                      <div class="flex justify-center gap-2 mt-2">
+                          @for (type of pokemon.types; track type.slot) {
+                              <span class="px-3 py-1 text-xs font-bold rounded-full" [class]="getTypeColor(type.type.name)">
+                                  {{ type.type.name | uppercase }}
+                              </span>
+                          }
+                      </div>
+                  </div>
+                  <div class="sm:w-2/3">
+                      <h3 class="text-lg font-bold mb-3">Base Stats</h3>
+                      <div class="space-y-2">
+                          @for (stat of pokemon.stats; track stat.stat.name) {
+                              <div class="flex items-center gap-2">
+                                  <span class="w-32 text-sm font-semibold capitalize text-gray-400">{{ stat.stat.name.replace('-', ' ') }}</span>
+                                  <div class="flex-grow flex items-center gap-2">
+                                      <span class="font-bold text-sm w-8">{{ stat.base_stat }}</span>
+                                      <div class="w-full bg-slate-700 rounded-full h-3">
+                                          <div class="h-3 rounded-full" [class]="getStatColor(stat.stat.name)" [style.width.%]="getStatPercentage(stat.base_stat)"></div>
+                                      </div>
+                                  </div>
+                              </div>
+                          }
+                      </div>
+                  </div>
+              </div>
             </div>
           } @else {
-            <div class="flex items-center justify-center h-full bg-slate-highlight/50 rounded-xl p-8">
-              <p class="text-gray-400">Select a Pokémon from the list to see its details.</p>
-            </div>
+              <div class="flex items-center justify-center bg-slate-highlight/50 rounded-lg p-8 min-h-[400px] md:h-[65vh]">
+                  <p class="text-gray-400">Select a Pokémon from the list to see details.</p>
+              </div>
           }
         </div>
       </div>

@@ -1,9 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, inject, OnDestroy, signal, effect } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, ViewChild, ElementRef } from '@angular/core';
 import { PokemonStore } from '../../store/pokemon.store';
 import { CommonModule } from '@angular/common';
 import { BattleLogicService } from '../../services/battle-logic.service';
-import { Subject } from 'rxjs';
-import { debounceTime, takeUntil, distinctUntilChanged } from 'rxjs/operators';
 import { Pokemon } from '../../models/pokemon.models';
 
 @Component({
@@ -12,79 +10,74 @@ import { Pokemon } from '../../models/pokemon.models';
   imports: [CommonModule],
   templateUrl: './compare.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '(document:click)': 'onClickOutside($event)',
+  },
 })
-export class CompareComponent implements OnDestroy {
+export class CompareComponent {
   store = inject(PokemonStore);
   battleLogic = inject(BattleLogicService);
 
-  pokemon1Query = signal('');
-  pokemon2Query = signal('');
+  @ViewChild('dropdownContainer1') dropdownContainer1Ref?: ElementRef<HTMLDivElement>;
+  @ViewChild('dropdownContainer2') dropdownContainer2Ref?: ElementRef<HTMLDivElement>;
 
-  private searchSubject1 = new Subject<string>();
-  private searchSubject2 = new Subject<string>();
-  private destroy$ = new Subject<void>();
+  private query1 = signal('');
+  private query2 = signal('');
 
-  constructor() {
-    this.searchSubject1.pipe(
-      debounceTime(500),
-      distinctUntilChanged(),
-      takeUntil(this.destroy$)
-    ).subscribe(name => {
-      this.store.setPokemonForComparison(name, 1);
-    });
-    
-    this.searchSubject2.pipe(
-      debounceTime(500),
-      distinctUntilChanged(),
-      takeUntil(this.destroy$)
-    ).subscribe(name => {
-      this.store.setPokemonForComparison(name, 2);
-    });
+  isDropdown1Open = signal(false);
+  isDropdown2Open = signal(false);
 
-    // This effect ensures the input fields are always in sync with the store's state,
-    // and it resets the search stream when a slot is cleared.
-    effect(() => {
-      const pair = this.store.comparisonPair();
+  filteredPokemon1 = computed(() => {
+    const q = this.query1().toLowerCase();
+    if (!q) return this.store.pokemonList();
+    return this.store.pokemonList().filter(p => p.name.toLowerCase().includes(q));
+  });
 
-      // Sync Slot 1
-      const p1Name = pair.pokemon1?.name ?? '';
-      if (this.pokemon1Query() !== p1Name) {
-        this.pokemon1Query.set(p1Name);
-        if (p1Name === '') {
-          // A clear happened (e.g., from an error or manual clear), so we must reset 
-          // the search subject to allow searching for the same failed term again.
-          this.searchSubject1.next('');
-        }
-      }
+  filteredPokemon2 = computed(() => {
+    const q = this.query2().toLowerCase();
+    if (!q) return this.store.pokemonList();
+    return this.store.pokemonList().filter(p => p.name.toLowerCase().includes(q));
+  });
 
-      // Sync Slot 2
-      const p2Name = pair.pokemon2?.name ?? '';
-      if (this.pokemon2Query() !== p2Name) {
-        this.pokemon2Query.set(p2Name);
-        if (p2Name === '') {
-          this.searchSubject2.next('');
-        }
-      }
-    }, { allowSignalWrites: true });
-  }
-
-  onSearch(event: Event, slot: 1 | 2) {
-    const query = (event.target as HTMLInputElement).value;
-    if (slot === 1) {
-      this.pokemon1Query.set(query);
-      this.searchSubject1.next(query);
-    } else {
-      this.pokemon2Query.set(query);
-      this.searchSubject2.next(query);
+  onClickOutside(event: Event): void {
+    const target = event.target as Node;
+    if (this.isDropdown1Open() && this.dropdownContainer1Ref && !this.dropdownContainer1Ref.nativeElement.contains(target)) {
+      this.isDropdown1Open.set(false);
+    }
+    if (this.isDropdown2Open() && this.dropdownContainer2Ref && !this.dropdownContainer2Ref.nativeElement.contains(target)) {
+      this.isDropdown2Open.set(false);
     }
   }
 
-  clearPokemon(slot: 1 | 2) {
-    this.store.clearComparisonSlot(slot);
-    // The effect will now handle clearing the query signal AND updating the subject.
+  onQueryChange(event: Event, slot: 1 | 2): void {
+    const query = (event.target as HTMLInputElement).value;
+    if (slot === 1) {
+      this.query1.set(query);
+    } else {
+      this.query2.set(query);
+    }
   }
 
-  changePokemon(slot: 1 | 2, direction: 'next' | 'prev') {
+  toggleDropdown(slot: 1 | 2): void {
+    if (slot === 1) {
+      this.isDropdown1Open.update(v => !v);
+      if (this.isDropdown1Open()) this.isDropdown2Open.set(false);
+    } else {
+      this.isDropdown2Open.update(v => !v);
+      if (this.isDropdown2Open()) this.isDropdown1Open.set(false);
+    }
+  }
+  
+  selectPokemon(pokemonName: string, slot: 1 | 2): void {
+    this.store.setPokemonForComparison(pokemonName, slot);
+    if (slot === 1) {
+      this.isDropdown1Open.set(false);
+    } else {
+      this.isDropdown2Open.set(false);
+    }
+  }
+
+  changePokemon(slot: 1 | 2, direction: 'next' | 'prev'): void {
     const pokemonList = this.store.pokemonList();
     if (pokemonList.length === 0) {
       return;
@@ -103,7 +96,7 @@ export class CompareComponent implements OnDestroy {
     if (direction === 'next') {
       nextIndex = (currentIndex + 1) % pokemonList.length;
     } else { // 'prev'
-      if (currentIndex <= 0) { // If it's the first one (-1) or nothing is selected (0)
+      if (currentIndex <= 0) { // If it's the first one or nothing is selected (-1)
         nextIndex = pokemonList.length - 1;
       } else {
         nextIndex = currentIndex - 1;
@@ -138,8 +131,7 @@ export class CompareComponent implements OnDestroy {
     return colors[typeName] || 'bg-gray-200';
   }
 
-  ngOnDestroy() {
-    this.destroy$.next();
-    this.destroy$.complete();
+  onImageError(event: Event) {
+    (event.target as HTMLImageElement).src = "data:image/svg+xml,%3csvg width='128' height='128' viewBox='0 0 128' 128' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='128' height='128' fill='%231e293b'/%3e%3cline x1='32' y1='32' x2='96' y2='96' stroke='%23475569' stroke-width='4'/%3e%3cline x1='96' y1='32' x2='32' y2='96' stroke='%23475569' stroke-width='4'/%3e%3ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='16' fill='%2394a3b8' dy='-1em'%3eImage%3c/text%3e%3ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='16' fill='%2394a3b8' dy='1em'%3eUnavailable%3c/text%3e%3c/svg%3e";
   }
 }

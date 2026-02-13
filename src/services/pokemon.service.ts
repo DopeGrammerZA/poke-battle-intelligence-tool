@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, from, of, throwError } from 'rxjs';
 import { mergeMap, catchError, retry, delay } from 'rxjs/operators';
 import { Pokemon, PokemonListResponse, PokemonSpecies, TypeDetails } from '../models/pokemon.models';
@@ -27,7 +27,9 @@ export class PokemonService {
       retry({
         count: 3,
         delay: (error: any, retryCount) => {
-           if (error.status === 429 || error.status >= 500) {
+           // Retry on rate limits, server errors, or network errors
+           if (error.status === 429 || error.status >= 500 || error.status === 0) {
+             console.log(`Attempt ${retryCount}: Retrying request to ${url} due to error...`);
              return of(true).pipe(delay(1000 * Math.pow(2, retryCount - 1)));
            }
            return throwError(() => error);
@@ -35,11 +37,18 @@ export class PokemonService {
       }),
       catchError((err: any) => {
         console.error(`Failed to fetch from ${url}`, err);
-        if (err.status === 404) {
-          const name = url.split('/').pop();
-          return throwError(() => new Error(`Pokémon '${name}' could not be found.`));
+        if (err instanceof HttpErrorResponse) {
+            if (err.status === 404) {
+              const name = url.split('/').pop();
+              return throwError(() => new Error(`Pokémon '${name}' could not be found.`));
+            }
+            if (err.status === 0 || err.error instanceof ErrorEvent) {
+                return throwError(() => new Error('A network error occurred. Please check your connection.'));
+            }
+            return throwError(() => new Error(`An API error occurred (Status: ${err.status}). Please try again.`));
         }
-        return throwError(() => new Error(`An API error occurred. Please try again.`));
+        // Generic fallback for non-Http errors
+        return throwError(() => new Error('An unexpected error occurred. Please try again.'));
       })
     );
   }
@@ -49,8 +58,8 @@ export class PokemonService {
     return this.fetchAndCache<PokemonListResponse>(url);
   }
 
-  getPokemonDetails(name: string): Observable<Pokemon> {
-    const url = `${this.baseUrl}/pokemon/${name.toLowerCase()}`;
+  getPokemonDetails(nameOrId: string): Observable<Pokemon> {
+    const url = `${this.baseUrl}/pokemon/${nameOrId.toLowerCase()}`;
     return this.fetchAndCache<Pokemon>(url).pipe(
         mergeMap(pokemon => {
             const speciesUrl = `${this.baseUrl}/pokemon-species/${pokemon.id}`;

@@ -1,10 +1,10 @@
-import { ChangeDetectionStrategy, Component, inject, OnDestroy, computed, effect, signal, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnDestroy, computed, effect, signal, ViewChild, ElementRef, OnInit } from '@angular/core';
 import { PokemonStore } from '../../store/pokemon.store';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
-import { BattleLogicService } from '../../services/battle-logic.service';
+import { PokemonListItem } from '../../models/pokemon.models';
 
 @Component({
   selector: 'app-pokemon-list',
@@ -12,216 +12,324 @@ import { BattleLogicService } from '../../services/battle-logic.service';
   imports: [CommonModule, RouterLink],
   templateUrl: './pokemon-list.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(keydown)': 'handleKeyDown($event)',
-    'tabindex': '0',
-    'class': 'focus:outline-none block'
-  }
 })
-export class PokemonListComponent implements OnDestroy, AfterViewInit {
+export class PokemonListComponent implements OnInit, OnDestroy {
   store = inject(PokemonStore);
-  battleLogic = inject(BattleLogicService);
   router = inject(Router);
-  elementRef = inject(ElementRef);
 
   @ViewChild('gridContainer') gridContainerRef?: ElementRef<HTMLDivElement>;
+  @ViewChild('searchInput') searchInputRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('listSearchInput') listSearchInputRef?: ElementRef<HTMLInputElement>;
   
   private searchSubject = new Subject<string>();
   private destroy$ = new Subject<void>();
   
   activeIndex = signal(-1);
-  isKeyboardNavActive = signal(true); // Start with keyboard nav enabled
+  selectedListItem = signal<PokemonListItem | null>(null);
+  isKeyboardNavActive = signal(true);
+  listSearchTerm = signal('');
+
+  private handleKeyDownBound: (event: KeyboardEvent) => void;
+
+  listToRender = computed(() => {
+    const list = this.store.filteredPokemon();
+    const term = this.listSearchTerm().toLowerCase();
+    if (!term) {
+        return list;
+    }
+    return list.filter(p => p.name.toLowerCase().includes(term));
+  });
 
   constructor() {
+    this.handleKeyDownBound = this.handleKeyDown.bind(this);
+
     this.searchSubject.pipe(
       debounceTime(300),
       distinctUntilChanged(),
       takeUntil(this.destroy$)
     ).subscribe(searchTerm => {
       this.store.setSearchTerm(searchTerm);
+      this.listSearchTerm.set('');
     });
 
-    // Effect to handle view mode changes
     effect(() => {
-      const view = this.store.viewMode();
-      const list = this.store.filteredPokemon();
-      const selected = this.store.selectedPokemon();
-
-      if (view === 'list' && list.length > 0 && !selected) {
-        // If switching to list view and nothing is selected, select the first item.
-        this.store.loadPokemonDetails(list[0].name);
+      // When the displayed list changes (e.g., search, page change), reset active index
+      this.store.pokemonToDisplay(); 
+      this.activeIndex.set(-1);
+    });
+    
+    effect(() => {
+      // When the full filtered list changes (search), also reset selection
+      this.store.filteredPokemon();
+      if(this.store.viewMode() === 'list') {
+          this.selectedListItem.set(null);
       }
     });
 
-    // Effect to reset active index when search term changes
     effect(() => {
-      this.store.filteredPokemon(); // depend on this signal
-      this.activeIndex.set(-1);
+      // When the list view's own filter changes, reset selection
+      this.listToRender();
+      if(this.store.viewMode() === 'list') {
+        this.activeIndex.set(-1);
+      }
     });
 
-    // Effect to scroll the active item into view
     effect(() => {
       const index = this.activeIndex();
-      if (index < 0 || !this.isKeyboardNavActive()) return;
-
-      // Use timeout to allow DOM to update after index change
-      setTimeout(() => {
-        const activeElement = document.getElementById(`pokemon-item-${index}`);
-        activeElement?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      }, 50);
+      if (index >= 0 && this.isKeyboardNavActive()) {
+        const viewMode = this.store.viewMode();
+        const elementId = viewMode === 'grid' ? `pokemon-item-${index}` : `pokemon-list-item-${index}`;
+        setTimeout(() => {
+          document.getElementById(elementId)?.scrollIntoView({ block: 'nearest' });
+        }, 50);
+      }
     });
   }
 
-  ngAfterViewInit(): void {
-    // Use a timeout to ensure focus is set after the view is fully rendered and stable.
-    // preventScroll avoids the page jumping if the component is not at the top.
-    setTimeout(() => this.elementRef.nativeElement.focus({ preventScroll: true }), 0);
+  ngOnInit(): void {
+    document.addEventListener('keydown', this.handleKeyDownBound);
   }
-
+  
   onMouseMove(): void {
-    // When the mouse is used, disable keyboard navigation highlight
     if (this.isKeyboardNavActive()) {
       this.isKeyboardNavActive.set(false);
     }
   }
 
   handleKeyDown(event: KeyboardEvent): void {
-    if ((event.target as HTMLElement).tagName === 'INPUT') {
+    const target = event.target as HTMLElement;
+    if (!target) return;
+
+    const listSearchInputId = 'pokemon-list-internal-search';
+
+    if ((target.id === 'pokemon-list-search' || target.id === listSearchInputId) && !['ArrowDown', 'ArrowUp', 'Tab', 'Enter', 'Escape', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+        this.isKeyboardNavActive.set(false);
+        return;
+    }
+    
+    // Handle list search input navigation
+    if (target.id === listSearchInputId) {
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            (target as HTMLElement).blur();
+            this.isKeyboardNavActive.set(true);
+            this.activeIndex.set(0);
+        }
+        return; // Exclusive handling for this input
+    }
+    
+    const targetId = target.id || '';
+    const paginationButtons = this.getPaginationButtons();
+    const isPaginationFocused = paginationButtons.some(btn => btn === target);
+    const isTopNavFocused = ['pokemon-list-search', 'grid-view-button', 'list-view-button'].includes(targetId);
+
+    if (isTopNavFocused) {
+        this.handleTopNav(event);
+    } else if (isPaginationFocused) {
+        this.handlePaginationNav(event, target, paginationButtons);
+    } else if (this.store.viewMode() === 'list') {
+        this.handleListNav(event);
+    } else {
+        this.handleGridNav(event);
+    }
+  }
+
+  private handleTopNav(event: KeyboardEvent): void {
+    const target = event.target as HTMLElement;
+    const topNavElements: string[] = ['pokemon-list-search', 'grid-view-button', 'list-view-button'];
+    const currentIndex = topNavElements.indexOf(target.id);
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      (event.target as HTMLElement).blur();
+      this.isKeyboardNavActive.set(true);
+      this.activeIndex.set(0);
+      return; // Exit after handling ArrowDown
+    }
+
+    if (event.key === 'ArrowRight') {
+      if (currentIndex > -1 && currentIndex < topNavElements.length - 1) {
+        event.preventDefault();
+        document.getElementById(topNavElements[currentIndex + 1])?.focus();
+      }
+    } else if (event.key === 'ArrowLeft') {
+      if (currentIndex > 0) {
+        event.preventDefault();
+        document.getElementById(topNavElements[currentIndex - 1])?.focus();
+      }
+    }
+  }
+
+  private handleGridNav(event: KeyboardEvent): void {
+      const list = this.store.pokemonToDisplay();
+      if (list.length === 0) return;
+
+      const currentActiveIndex = this.activeIndex();
+      const colCount = this.getColumnCount();
+
+      const arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+      if (arrowKeys.includes(event.key)) {
+          event.preventDefault();
+          this.isKeyboardNavActive.set(true);
+      }
+      
+      if (event.key === 'Enter' || event.key === ' ') {
+        if (currentActiveIndex !== -1) {
+          event.preventDefault();
+          const pokemon = list[currentActiveIndex];
+          const pokemonId = this.getPokemonId(pokemon.url);
+          this.router.navigate(['/pokemon', pokemonId]);
+        }
+        return;
+      }
+
+      let nextIndex = currentActiveIndex;
+      if (currentActiveIndex === -1 && arrowKeys.includes(event.key)) {
+        nextIndex = 0;
+      } else {
+        switch (event.key) {
+            case 'ArrowRight': nextIndex = Math.min(list.length - 1, currentActiveIndex + 1); break;
+            case 'ArrowLeft': nextIndex = Math.max(0, currentActiveIndex - 1); break;
+            case 'ArrowDown':
+                if (currentActiveIndex >= list.length - colCount) {
+                    this.activeIndex.set(-1);
+                    this.getPaginationButtons()[0]?.focus();
+                    return;
+                }
+                nextIndex = Math.min(list.length - 1, currentActiveIndex + colCount);
+                break;
+            case 'ArrowUp':
+                if (currentActiveIndex < colCount) {
+                    this.activeIndex.set(-1);
+                    this.searchInputRef?.nativeElement.focus();
+                    return;
+                }
+                nextIndex = Math.max(0, currentActiveIndex - colCount);
+                break;
+        }
+      }
+      this.activeIndex.set(nextIndex);
+  }
+
+  private handleListNav(event: KeyboardEvent): void {
+    const list = this.listToRender();
+    if (list.length === 0) return;
+
+    const currentActiveIndex = this.activeIndex();
+    const arrowKeys = ['ArrowUp', 'ArrowDown'];
+    if (arrowKeys.includes(event.key)) {
+      event.preventDefault();
+      this.isKeyboardNavActive.set(true);
+    }
+    
+    if (event.key === 'Enter' || event.key === ' ') {
+      if (currentActiveIndex !== -1) {
+        event.preventDefault();
+        const pokemon = list[currentActiveIndex];
+        this.selectPokemon(pokemon);
+      }
       return;
     }
 
-    const list = this.store.filteredPokemon();
-    if (list.length === 0) return;
-    
-    const arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-    
-    // When an arrow key is pressed, re-enable keyboard navigation if it was disabled.
-    if (arrowKeys.includes(event.key)) {
-      if (!this.isKeyboardNavActive()) {
-        this.isKeyboardNavActive.set(true);
+    let nextIndex = currentActiveIndex;
+    if (currentActiveIndex === -1 && arrowKeys.includes(event.key)) {
+      nextIndex = 0;
+    } else {
+      switch (event.key) {
+        case 'ArrowDown':
+          nextIndex = currentActiveIndex >= list.length - 1 ? 0 : currentActiveIndex + 1;
+          break;
+        case 'ArrowUp':
+          if (currentActiveIndex <= 0) {
+            this.activeIndex.set(-1);
+            this.listSearchInputRef?.nativeElement.focus();
+            return;
+          }
+          nextIndex = currentActiveIndex - 1;
+          break;
       }
     }
+    this.activeIndex.set(nextIndex);
+  }
 
-    if ([...arrowKeys, 'Enter'].includes(event.key)) {
-        event.preventDefault();
+  private handlePaginationNav(event: KeyboardEvent, currentTarget: HTMLElement, allButtons: HTMLElement[]): void {
+    this.isKeyboardNavActive.set(true);
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      (currentTarget as HTMLElement).blur();
+
+      const list = this.store.pokemonToDisplay();
+      if (list.length > 0) {
+        const colCount = this.getColumnCount();
+        const lastRowStartIndex = Math.floor((list.length - 1) / colCount) * colCount;
+        this.activeIndex.set(lastRowStartIndex);
+      }
+      return;
     }
 
-    const currentActiveIndex = this.activeIndex();
-    const listSize = list.length;
-    let nextIndex = currentActiveIndex;
-
-    if (event.key === 'Enter') {
-        if (currentActiveIndex !== -1) {
-            const pokemon = list[currentActiveIndex];
-            if (this.store.viewMode() === 'grid') {
-                this.router.navigate(['/pokemon', pokemon.name]);
-            } else {
-                this.selectPokemon(pokemon.name);
-            }
-        }
-        return;
+    const currentIndex = allButtons.indexOf(currentTarget);
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      const nextButton = allButtons[Math.min(allButtons.length - 1, currentIndex + 1)];
+      nextButton?.focus();
+    } else if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      const prevButton = allButtons[Math.max(0, currentIndex - 1)];
+      prevButton?.focus();
     }
-
-    if (currentActiveIndex === -1) {
-        // When no item is selected, any arrow key press should select the first item.
-        if (arrowKeys.includes(event.key)) {
-            nextIndex = 0;
-        }
-    } else {
-        const isListView = this.store.viewMode() === 'list';
-
-        if (isListView) {
-            // Simplified logic for single-column list view
-            switch (event.key) {
-                case 'ArrowDown':
-                case 'ArrowRight':
-                    nextIndex = currentActiveIndex + 1;
-                    if (nextIndex >= listSize) nextIndex = 0; // Wrap to start
-                    break;
-                case 'ArrowUp':
-                case 'ArrowLeft':
-                    nextIndex = currentActiveIndex - 1;
-                    if (nextIndex < 0) nextIndex = listSize - 1; // Wrap to end
-                    break;
-            }
-        } else {
-            // Original logic for grid view
-            const colCount = this.getColumnCount();
-            switch (event.key) {
-                case 'ArrowRight':
-                    nextIndex = currentActiveIndex + 1;
-                    if (nextIndex >= listSize) nextIndex = 0;
-                    break;
-                case 'ArrowLeft':
-                    nextIndex = currentActiveIndex - 1;
-                    if (nextIndex < 0) nextIndex = listSize - 1;
-                    break;
-                case 'ArrowDown':
-                    nextIndex = currentActiveIndex + colCount;
-                    if (nextIndex >= listSize) {
-                        nextIndex = (currentActiveIndex % colCount);
-                         if (nextIndex >= listSize) { 
-                            nextIndex = listSize - 1;
-                        }
-                    }
-                    break;
-                case 'ArrowUp':
-                    nextIndex = currentActiveIndex - colCount;
-                    if (nextIndex < 0) {
-                        const col = currentActiveIndex % colCount;
-                        let lastInCol = listSize - 1 - ((listSize - 1) % colCount) + col;
-                        while (lastInCol >= listSize) {
-                            lastInCol -= colCount;
-                        }
-                        nextIndex = lastInCol;
-                    }
-                    break;
-            }
-        }
-    }
-
-    if (nextIndex !== this.activeIndex()) {
-        this.activeIndex.set(nextIndex);
-    }
+  }
+  
+  private getPaginationButtons(): HTMLElement[] {
+    const container = document.getElementById('pagination-controls');
+    return container ? Array.from(container.querySelectorAll('button')) : [];
   }
 
   private getColumnCount(): number {
-    if (this.store.viewMode() === 'list') {
-        return 1;
-    }
-    if (this.gridContainerRef?.nativeElement) {
-        const grid = this.gridContainerRef.nativeElement;
-        const colCount = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
-        return colCount > 0 ? colCount : 1;
-    }
-    // Fallback based on typical screen size if ref isn't ready
-    if (window.innerWidth >= 1280) return 6;
-    if (window.innerWidth >= 1024) return 5;
-    if (window.innerWidth >= 768) return 4;
-    if (window.innerWidth >= 640) return 3;
-    return 2;
+    if (!this.gridContainerRef?.nativeElement) return 5; // fallback
+    return getComputedStyle(this.gridContainerRef.nativeElement).gridTemplateColumns.split(' ').length;
   }
 
-  onSearch(event: Event): void {
-    const inputElement = event.target as HTMLInputElement;
-    this.searchSubject.next(inputElement.value);
+  onSearch(event: Event) {
+    this.searchSubject.next((event.target as HTMLInputElement).value);
   }
 
-  setViewMode(mode: 'grid' | 'list'): void {
+  onListSearch(event: Event) {
+    this.listSearchTerm.set((event.target as HTMLInputElement).value);
+  }
+
+  selectPokemon(pokemon: PokemonListItem): void {
+    this.selectedListItem.set(pokemon);
+    const pokemonId = this.getPokemonId(pokemon.url);
+    this.store.loadPokemonDetails(pokemonId);
+  }
+
+  setViewMode(mode: 'grid' | 'list') {
     this.store.setViewMode(mode);
+    this.selectedListItem.set(null);
   }
 
-  selectPokemon(name: string): void {
-    this.store.loadPokemonDetails(name);
-    const index = this.store.filteredPokemon().findIndex(p => p.name === name);
-    this.activeIndex.set(index);
+  retryLoad(): void {
+    this.store.loadInitialPokemon();
   }
 
-  battleReadinessScore = computed(() => {
-    const p = this.store.selectedPokemon();
-    return p ? this.battleLogic.calculateBattleReadinessScore(p) : 0;
+  paginationRange = computed(() => {
+    const total = this.store.totalPages(), current = this.store.currentPage();
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    if (current < 5) return [1, 2, 3, 4, 5, '...', total];
+    if (current > total - 4) return [1, '...', total - 4, total - 3, total - 2, total - 1, total];
+    return [1, '...', current - 1, current, current + 1, '...', total];
   });
 
+  getPokemonId(url: string): string {
+    const parts = url.split('/');
+    return parts[parts.length - 2];
+  }
+
+  onImageError(event: Event) {
+    (event.target as HTMLImageElement).src = "data:image/svg+xml,%3csvg width='128' height='128' viewBox='0 0 128' 128' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='128' height='128' fill='%231e293b'/%3e%3cline x1='32' y1='32' x2='96' y2='96' stroke='%23475569' stroke-width='4'/%3e%3cline x1='96' y1='32' x2='32' y2='96' stroke='%23475569' stroke-width='4'/%3e%3ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='16' fill='%2394a3b8' dy='-1em'%3eImage%3c/text%3e%3ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='16' fill='%2394a3b8' dy='1em'%3eUnavailable%3c/text%3e%3c/svg%3e";
+  }
+  
   getStatPercentage(baseStat: number): number {
     return (baseStat / 255) * 100;
   }
@@ -250,20 +358,9 @@ export class PokemonListComponent implements OnDestroy, AfterViewInit {
     return colors[typeName] || 'bg-gray-200';
   }
 
-  getScoreColor(score: number): string {
-    if (score >= 80) return 'text-neon-mint';
-    if (score >= 60) return 'text-green-400';
-    if (score >= 40) return 'text-yellow-400';
-    return 'text-red-400';
-  }
-
   ngOnDestroy(): void {
+    document.removeEventListener('keydown', this.handleKeyDownBound);
     this.destroy$.next();
     this.destroy$.complete();
-  }
-
-  getPokemonId(url: string): string {
-    const parts = url.split('/');
-    return parts[parts.length - 2];
   }
 }

@@ -15,9 +15,18 @@ export class PokemonDetailComponent {
   store = inject(PokemonStore);
   battleLogic = inject(BattleLogicService);
 
+  private pokemonId: string = '';
+
   @Input({ required: true })
-  set name(pokemonName: string) {
-    this.store.loadPokemonDetails(pokemonName);
+  set id(pokemonId: string) {
+    this.pokemonId = pokemonId;
+    this.store.loadPokemonDetails(pokemonId);
+  }
+
+  retryLoad(): void {
+    if (this.pokemonId) {
+      this.store.loadPokemonDetails(this.pokemonId);
+    }
   }
 
   battleReadinessScore = computed(() => {
@@ -58,5 +67,9 @@ export class PokemonDetailComponent {
     if (score >= 60) return 'text-green-400';
     if (score >= 40) return 'text-yellow-400';
     return 'text-red-400';
+  }
+
+  onImageError(event: Event) {
+    (event.target as HTMLImageElement).src = "data:image/svg+xml,%3csvg width='128' height='128' viewBox='0 0 128' 128' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='128' height='128' fill='%231e293b'/%3e%3cline x1='32' y1='32' x2='96' y2='96' stroke='%23475569' stroke-width='4'/%3e%3cline x1='96' y1='32' x2='32' y2='96' stroke='%23475569' stroke-width='4'/%3e%3ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='16' fill='%2394a3b8' dy='-1em'%3eImage%3c/text%3e%3ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='16' fill='%2394a3b8' dy='1em'%3eUnavailable%3c/text%3e%3c/svg%3e";
   }
 }
