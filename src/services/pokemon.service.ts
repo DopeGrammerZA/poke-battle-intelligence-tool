@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, from, of, throwError } from 'rxjs';
 import { mergeMap, catchError, retry, delay } from 'rxjs/operators';
-import { Pokemon, PokemonListResponse, PokemonSpecies, TypeDetails } from '../models/pokemon.models';
+import { Pokemon, PokemonListResponse, PokemonSpecies, TypeDetails, EvolutionChain } from '../models/pokemon.models';
 import { CachingService } from './caching.service';
 
 @Injectable({
@@ -65,15 +65,30 @@ export class PokemonService {
             const speciesUrl = `${this.baseUrl}/pokemon-species/${pokemon.id}`;
             return this.fetchAndCache<PokemonSpecies>(speciesUrl).pipe(
                 mergeMap(species => {
+                    const englishFlavorText = [...species.flavor_text_entries]
+                      .reverse()
+                      .find(entry => entry.language.name === 'en')
+                      ?.flavor_text.replace(/[\n\f\r]/g, ' ');
+
                     return of({
                         ...pokemon,
                         is_legendary: species.is_legendary,
                         is_mythical: species.is_mythical,
+                        flavor_text: englishFlavorText,
                     });
                 })
             );
         })
     );
+  }
+
+  getPokemonSpecies(nameOrId: string): Observable<PokemonSpecies> {
+    const url = `${this.baseUrl}/pokemon-species/${nameOrId.toLowerCase()}`;
+    return this.fetchAndCache<PokemonSpecies>(url);
+  }
+
+  getEvolutionChainByUrl(url: string): Observable<EvolutionChain> {
+      return this.fetchAndCache<EvolutionChain>(url);
   }
   
   getPokemonByUrl(url: string): Observable<Pokemon> {
@@ -82,10 +97,16 @@ export class PokemonService {
             const speciesUrl = `${this.baseUrl}/pokemon-species/${pokemon.id}`;
             return this.fetchAndCache<PokemonSpecies>(speciesUrl).pipe(
                 mergeMap(species => {
+                    const englishFlavorText = [...species.flavor_text_entries]
+                      .reverse()
+                      .find(entry => entry.language.name === 'en')
+                      ?.flavor_text.replace(/[\n\f\r]/g, ' ');
+                      
                     return of({
                         ...pokemon,
                         is_legendary: species.is_legendary,
                         is_mythical: species.is_mythical,
+                        flavor_text: englishFlavorText,
                     });
                 })
             );

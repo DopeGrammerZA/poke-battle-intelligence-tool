@@ -6,7 +6,6 @@ import { Pokemon } from '../../models/pokemon.models';
 
 @Component({
   selector: 'app-compare',
-  standalone: true,
   imports: [CommonModule],
   templateUrl: './compare.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,

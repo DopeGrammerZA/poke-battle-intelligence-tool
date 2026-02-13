@@ -3,7 +3,6 @@ import { PokemonStore } from '../../store/pokemon.store';
 import { PokemonService } from '../../services/pokemon.service';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-// FIX: Import `of` and `forkJoin` from RxJS, and `catchError` and `finalize` from `rxjs/operators` to gracefully handle API errors within streams.
 import { forkJoin, of } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
 import { Pokemon, PokemonListItem } from '../../models/pokemon.models';
@@ -14,7 +13,6 @@ interface ApexPokemon extends Pokemon {
 
 @Component({
   selector: 'app-type-explorer',
-  standalone: true,
   imports: [CommonModule, RouterLink],
   templateUrl: './type-explorer.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -15,24 +15,41 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
       </div>
     </div>
-    <!-- View Toggle Buttons -->
-    <div class="flex-shrink-0 flex items-center bg-slate-highlight border border-slate-700 rounded-lg p-1">
-      <button #gridButton
-              id="grid-view-button"
-              (click)="setViewMode('grid')" 
-              [class]="store.viewMode() === 'grid' ? 'bg-slate-700 text-neon-mint' : 'text-gray-400 hover:bg-slate-800'"
-              class="p-2 rounded-md transition-colors focus:ring-2 focus:ring-neon-mint focus:outline-none"
-              aria-label="Switch to grid view">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
-      </button>
-      <button #listButton
-              id="list-view-button"
-              (click)="setViewMode('list')" 
-              [class]="store.viewMode() === 'list' ? 'bg-slate-700 text-neon-mint' : 'text-gray-400 hover:bg-slate-800'"
-              class="p-2 rounded-md transition-colors focus:ring-2 focus:ring-neon-mint focus:outline-none"
-              aria-label="Switch to list view">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
-      </button>
+    <!-- Right side controls group -->
+    <div class="flex-shrink-0 flex items-center gap-4 w-full sm:w-auto">
+      <!-- Sort Dropdown -->
+      <div class="flex-grow">
+          <select 
+            id="sort-order-select"
+            (change)="onSortChange($event)"
+            [value]="store.sortOrder()"
+            class="bg-slate-highlight border border-slate-700 text-white text-sm rounded-lg focus:ring-neon-mint focus:border-neon-mint block w-full p-3 h-full"
+            aria-label="Sort Pokémon list">
+              <option value="id-asc">Sort by ID (Asc)</option>
+              <option value="id-desc">Sort by ID (Desc)</option>
+              <option value="name-asc">Sort by Name (A-Z)</option>
+              <option value="name-desc">Sort by Name (Z-A)</option>
+          </select>
+      </div>
+      <!-- View Toggle Buttons -->
+      <div class="flex-shrink-0 flex items-center bg-slate-highlight border border-slate-700 rounded-lg p-1">
+        <button #gridButton
+                id="grid-view-button"
+                (click)="setViewMode('grid')" 
+                [class]="store.viewMode() === 'grid' ? 'bg-slate-700 text-neon-mint' : 'text-gray-400 hover:bg-slate-800'"
+                class="p-2 rounded-md transition-colors focus:ring-2 focus:ring-neon-mint focus:outline-none"
+                aria-label="Switch to grid view">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+        </button>
+        <button #listButton
+                id="list-view-button"
+                (click)="setViewMode('list')" 
+                [class]="store.viewMode() === 'list' ? 'bg-slate-700 text-neon-mint' : 'text-gray-400 hover:bg-slate-800'"
+                class="p-2 rounded-md transition-colors focus:ring-2 focus:ring-neon-mint focus:outline-none"
+                aria-label="Switch to list view">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -68,7 +85,7 @@
               [src]="'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/' + pokemonId + '.png'" 
               [alt]="pokemon.name"
               class="w-24 h-24 object-contain transition-transform duration-300 group-hover:scale-110"
-              loading="lazy"
+              [attr.loading]="i < 6 ? 'eager' : 'lazy'"
               width="96"
               height="96"
               (error)="onImageError($event)"
@@ -83,36 +100,6 @@
           </div>
         }
       </div>
-
-      <!-- PAGINATION CONTROLS -->
-      @if (store.totalPages() > 1) {
-        <div id="pagination-controls" class="flex justify-center items-center gap-1 sm:gap-2 mt-8 text-sm">
-          <button (click)="store.previousPage()" [disabled]="store.currentPage() === 1"
-                  class="px-3 py-2 bg-slate-highlight border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-neon-mint"
-                  aria-label="Go to previous page">
-            &larr; Prev
-          </button>
-
-          @for(page of paginationRange(); track $index) {
-            @if (page === '...') {
-              <span class="px-2 sm:px-3 py-2 text-gray-400">...</span>
-            } @else {
-              <button (click)="store.goToPage(page)"
-                      [class]="store.currentPage() === page ? 'bg-neon-mint text-slate-deep font-bold' : 'bg-slate-highlight border border-slate-700 hover:bg-slate-700'"
-                      class="w-10 h-10 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-neon-mint"
-                      [attr.aria-label]="'Go to page ' + page">
-                {{ page }}
-              </button>
-            }
-          }
-
-          <button (click)="store.nextPage()" [disabled]="store.currentPage() === store.totalPages()"
-                  class="px-3 py-2 bg-slate-highlight border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-neon-mint"
-                  aria-label="Go to next page">
-            Next &rarr;
-          </button>
-        </div>
-      }
     } @else {
       <!-- LIST VIEW -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -197,6 +184,36 @@
               </div>
           }
         </div>
+      </div>
+    }
+
+    <!-- PAGINATION CONTROLS -->
+    @if (store.viewMode() === 'grid' && store.totalPages() > 1) {
+      <div id="pagination-controls" class="flex justify-center items-center gap-1 sm:gap-2 mt-8 text-sm">
+        <button (click)="store.previousPage()" [disabled]="store.currentPage() === 1"
+                class="px-3 py-2 bg-slate-highlight border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-neon-mint"
+                aria-label="Go to previous page">
+          &larr; Prev
+        </button>
+
+        @for(page of paginationRange(); track $index) {
+          @if (page === '...') {
+            <span class="px-2 sm:px-3 py-2 text-gray-400">...</span>
+          } @else {
+            <button (click)="store.goToPage(page)"
+                    [class]="store.currentPage() === page ? 'bg-neon-mint text-slate-deep font-bold' : 'bg-slate-highlight border border-slate-700 hover:bg-slate-700'"
+                    class="w-10 h-10 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-neon-mint"
+                    [attr.aria-label]="'Go to page ' + page">
+              {{ page }}
+            </button>
+          }
+        }
+
+        <button (click)="store.nextPage()" [disabled]="store.currentPage() === store.totalPages()"
+                class="px-3 py-2 bg-slate-highlight border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-neon-mint"
+                aria-label="Go to next page">
+          Next &rarr;
+        </button>
       </div>
     }
   }

@@ -8,16 +8,25 @@
             <span>PokéIntel</span>
           </a>
         </div>
-        <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-1 sm:space-x-4">
           <a routerLink="/pokemon" routerLinkActive="text-neon-mint" [routerLinkActiveOptions]="{exact: true}"
              class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-white hover:bg-slate-700 transition-colors"
              aria-label="View Pokémon list">Pokédex</a>
           <a routerLink="/compare" routerLinkActive="text-neon-mint"
              class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-white hover:bg-slate-700 transition-colors"
              aria-label="Compare Pokémon">Compare</a>
+           <a routerLink="/items" routerLinkActive="text-neon-mint"
+             class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-white hover:bg-slate-700 transition-colors"
+             aria-label="Explore Pokémon items">Item Dex</a>
+           <a routerLink="/abilities" routerLinkActive="text-neon-mint"
+             class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-white hover:bg-slate-700 transition-colors"
+             aria-label="Explore Pokémon abilities">Abilities</a>
           <a routerLink="/types" routerLinkActive="text-neon-mint"
              class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-white hover:bg-slate-700 transition-colors"
              aria-label="Explore Pokémon types">Type Explorer</a>
+          <a routerLink="/evolutions" routerLinkActive="text-neon-mint"
+             class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-white hover:bg-slate-700 transition-colors"
+             aria-label="Explore evolution chains">Evolutions</a>
         </div>
       </div>
     </nav>

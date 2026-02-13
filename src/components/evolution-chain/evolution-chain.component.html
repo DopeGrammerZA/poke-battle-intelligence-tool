@@ -1,0 +1,102 @@
+<div class="flex flex-col gap-8">
+  <div class="max-w-md mx-auto w-full">
+    <label for="pokemon-search" class="block text-sm font-medium text-gray-300 mb-2 text-center">Select a Pokémon to see its evolution chain</label>
+    <div #dropdownContainer class="relative">
+      <div class="relative">
+        <input 
+          id="pokemon-search"
+          type="text" 
+          placeholder="Search (e.g., Eevee)..."
+          (input)="onQueryChange($event)"
+          (focus)="isDropdownOpen.set(true)"
+          [value]="query()"
+          class="w-full pl-10 pr-4 py-3 bg-slate-highlight border border-slate-700 rounded-lg focus:ring-2 focus:ring-neon-mint focus:outline-none transition-shadow"
+          aria-label="Search for a Pokémon"
+        >
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </div>
+      </div>
+        
+      @if (isDropdownOpen()) {
+          <div class="absolute z-10 mt-1 w-full bg-slate-highlight border border-slate-600 rounded-lg shadow-lg">
+              <ul class="max-h-60 overflow-auto" role="listbox">
+                  @for(p of filteredPokemon(); track p.name) {
+                      <li (click)="selectPokemon(p.name)" class="p-2.5 capitalize cursor-pointer hover:bg-slate-700 text-sm" role="option">
+                          {{ p.name }}
+                      </li>
+                  } @empty {
+                      <li class="p-2.5 text-gray-400 text-sm">No Pokémon found.</li>
+                  }
+              </ul>
+          </div>
+      }
+    </div>
+  </div>
+
+  <div class="bg-slate-highlight/50 backdrop-blur-md border border-white/10 rounded-xl p-8 min-h-[300px] flex items-center justify-center">
+    @if(store.loadingEvolution()) {
+        <div class="animate-pulse text-gray-400">Loading evolution chain...</div>
+    } @else if(store.evolutionError(); as error) {
+        <div class="text-center text-red-300">
+            <p>Error: {{ error }}</p>
+            <p class="text-sm mt-2">Could not retrieve the evolution chain.</p>
+        </div>
+    } @else if(store.evolutionChain(); as chain) {
+        @if (chain.chain.evolves_to.length === 0) {
+             <div class="text-center">
+                <div class="inline-block bg-slate-highlight/50 rounded-lg p-4">
+                    <img [src]="'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/' + basePokemon()?.id + '.png'" [alt]="basePokemon()?.name" class="w-24 h-24 object-contain" (error)="onImageError($event)">
+                    <p class="mt-2 text-center font-semibold capitalize">{{ basePokemon()?.name }}</p>
+                </div>
+                <p class="text-xl text-gray-400 mt-4 capitalize">{{ basePokemon()?.name }} does not evolve.</p>
+            </div>
+        } @else {
+            <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-8 w-full">
+                <!-- Base Pokémon -->
+                <div class="text-center">
+                    <a [routerLink]="['/pokemon', basePokemon()?.id]" class="group inline-block bg-slate-highlight/50 border border-transparent hover:border-neon-mint/50 rounded-lg p-4 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-neon-mint/10">
+                        <img [src]="'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/' + basePokemon()?.id + '.png'" [alt]="basePokemon()?.name" class="w-24 h-24 object-contain transition-transform duration-300 group-hover:scale-110" (error)="onImageError($event)">
+                        <p class="mt-2 text-center font-semibold capitalize text-gray-300 group-hover:text-neon-mint transition-colors">{{ basePokemon()?.name }}</p>
+                    </a>
+                </div>
+
+                @for(stage of parsedEvolutionChain(); track stage.from.name) {
+                    <div class="flex items-center justify-center gap-x-4 gap-y-8">
+                        <!-- Evolution Details and Arrow for the first evolution in a stage -->
+                        <div class="text-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                            <p class="text-xs text-neon-mint/80 font-mono mt-1 capitalize max-w-[100px]">{{ stage.to[0].details }}</p>
+                        </div>
+
+                        <!-- Evolution Results -->
+                        <div class="flex flex-col gap-4">
+                            @for(evo of stage.to; track evo.name) {
+                                <div class="flex items-center gap-4">
+                                    @if(stage.to.length > 1) {
+                                        <!-- Show mini-arrow for branches -->
+                                        <div class="text-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                                            <p class="text-xs text-neon-mint/80 font-mono mt-1 capitalize max-w-[100px]">{{ evo.details }}</p>
+                                        </div>
+                                    }
+                                    <div class="text-center">
+                                        <a [routerLink]="['/pokemon', evo.id]" class="group inline-block bg-slate-highlight/50 border border-transparent hover:border-neon-mint/50 rounded-lg p-4 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-neon-mint/10">
+                                            <img [src]="'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/' + evo.id + '.png'" [alt]="evo.name" class="w-24 h-24 object-contain transition-transform duration-300 group-hover:scale-110" (error)="onImageError($event)">
+                                            <p class="mt-2 text-center font-semibold capitalize text-gray-300 group-hover:text-neon-mint transition-colors">{{ evo.name }}</p>
+                                        </a>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    } @else {
+        <div class="text-center text-xl text-gray-400">
+            <p>Ready to explore evolutions!</p>
+        </div>
+    }
+  </div>
+</div>

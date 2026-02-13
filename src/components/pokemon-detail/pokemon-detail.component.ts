@@ -6,7 +6,6 @@ import { BattleLogicService } from '../../services/battle-logic.service';
 
 @Component({
   selector: 'app-pokemon-detail',
-  standalone: true,
   imports: [CommonModule, RouterLink],
   templateUrl: './pokemon-detail.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -33,6 +32,10 @@ export class PokemonDetailComponent {
     const p = this.store.selectedPokemon();
     return p ? this.battleLogic.calculateBattleReadinessScore(p) : 0;
   });
+
+  getFormattedId(id: number): string {
+    return id.toString().padStart(3, '0');
+  }
 
   getStatPercentage(baseStat: number): number {
     return (baseStat / 255) * 100;

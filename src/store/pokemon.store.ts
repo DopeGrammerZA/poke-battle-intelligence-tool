@@ -1,41 +1,49 @@
 import { Injectable, signal, computed, effect, inject, WritableSignal, Signal } from '@angular/core';
-import { Pokemon, PokemonListItem, TypeDetails, ComparisonPair } from '../models/pokemon.models';
+import { Pokemon, PokemonListItem, TypeDetails, ComparisonPair, EvolutionChain } from '../models/pokemon.models';
 import { PokemonService } from '../services/pokemon.service';
 import { forkJoin, of } from 'rxjs';
-import { catchError, finalize } from 'rxjs/operators';
+import { catchError, finalize, mergeMap } from 'rxjs/operators';
+
+type SortOrder = 'id-asc' | 'id-desc' | 'name-asc' | 'name-desc';
 
 // State interface
 interface PokemonState {
   pokemonList: PokemonListItem[];
-  // REMOVED: filteredPokemon - This is derived state and should not be part of the core state.
   selectedPokemon: Pokemon | null;
   comparisonPair: ComparisonPair;
   allTypes: {name: string, url: string}[];
   selectedType: TypeDetails | null;
+  evolutionChain: EvolutionChain | null;
   loading: boolean;
   loadingComparison: { slot1: boolean; slot2: boolean };
+  loadingEvolution: boolean;
   error: string | null;
   comparisonError: string | null;
+  evolutionError: string | null;
   searchTerm: string;
   viewMode: 'grid' | 'list';
   currentPage: number;
+  sortOrder: SortOrder;
 }
 
 // Initial state
 const initialState: PokemonState = {
   pokemonList: [],
-  // REMOVED: filteredPokemon - It is now purely a computed signal.
   selectedPokemon: null,
   comparisonPair: { pokemon1: null, pokemon2: null },
   allTypes: [],
   selectedType: null,
+  evolutionChain: null,
   loading: false,
   loadingComparison: { slot1: false, slot2: false },
+  loadingEvolution: false,
   error: null,
   comparisonError: null,
+  evolutionError: null,
   searchTerm: '',
   viewMode: 'grid',
   currentPage: 1,
+  sortOrder: 'id-asc',
 };
 
 @Injectable({
@@ -52,13 +60,17 @@ export class PokemonStore {
     comparisonPair: signal<ComparisonPair>(initialState.comparisonPair),
     allTypes: signal<{name: string, url: string}[]>(initialState.allTypes),
     selectedType: signal<TypeDetails | null>(initialState.selectedType),
+    evolutionChain: signal<EvolutionChain | null>(initialState.evolutionChain),
     loading: signal<boolean>(initialState.loading),
     loadingComparison: signal<{ slot1: boolean; slot2: boolean }>(initialState.loadingComparison),
+    loadingEvolution: signal<boolean>(initialState.loadingEvolution),
     error: signal<string | null>(initialState.error),
     comparisonError: signal<string | null>(initialState.comparisonError),
+    evolutionError: signal<string | null>(initialState.evolutionError),
     searchTerm: signal<string>(initialState.searchTerm),
     viewMode: signal<'grid' | 'list'>(initialState.viewMode),
     currentPage: signal<number>(initialState.currentPage),
+    sortOrder: signal<SortOrder>(initialState.sortOrder),
   };
 
   // Selectors (public computed signals)
@@ -67,20 +79,45 @@ export class PokemonStore {
   readonly comparisonPair = this.state.comparisonPair.asReadonly();
   readonly allTypes = this.state.allTypes.asReadonly();
   readonly selectedType = this.state.selectedType.asReadonly();
+  readonly evolutionChain = this.state.evolutionChain.asReadonly();
   readonly loading = this.state.loading.asReadonly();
   readonly loadingComparison = this.state.loadingComparison.asReadonly();
+  readonly loadingEvolution = this.state.loadingEvolution.asReadonly();
   readonly error = this.state.error.asReadonly();
   readonly comparisonError = this.state.comparisonError.asReadonly();
+  readonly evolutionError = this.state.evolutionError.asReadonly();
   readonly searchTerm = this.state.searchTerm.asReadonly();
   readonly viewMode = this.state.viewMode.asReadonly();
   readonly currentPage = this.state.currentPage.asReadonly();
+  readonly sortOrder = this.state.sortOrder.asReadonly();
   
   readonly filteredPokemon = computed(() => {
     const term = this.state.searchTerm().toLowerCase();
-    if (!term) {
-      return this.state.pokemonList();
-    }
-    return this.state.pokemonList().filter(p => p.name.toLowerCase().includes(term));
+    const sortOrder = this.state.sortOrder();
+
+    const filtered = !term
+      ? this.state.pokemonList()
+      : this.state.pokemonList().filter(p => p.name.toLowerCase().includes(term));
+    
+    // Helper to get ID
+    const getPokemonId = (url: string): number => {
+        const parts = url.split('/');
+        return parseInt(parts[parts.length - 2], 10);
+    };
+
+    return [...filtered].sort((a, b) => {
+      switch (sortOrder) {
+        case 'id-desc':
+          return getPokemonId(b.url) - getPokemonId(a.url);
+        case 'name-asc':
+          return a.name.localeCompare(b.name);
+        case 'name-desc':
+          return b.name.localeCompare(a.name);
+        case 'id-asc':
+        default:
+          return getPokemonId(a.url) - getPokemonId(b.url);
+      }
+    });
   });
 
   readonly totalPages = computed(() => {
@@ -126,16 +163,17 @@ export class PokemonStore {
   loadPokemonDetails(nameOrId: string): void {
     this.state.loading.set(true);
     this.state.error.set(null);
-    this.pokemonService.getPokemonDetails(nameOrId).subscribe({
+    this.state.selectedPokemon.set(null); // Clear previous selection
+    this.pokemonService.getPokemonDetails(nameOrId).pipe(
+      finalize(() => this.state.loading.set(false))
+    ).subscribe({
       next: (pokemon) => {
         this.state.selectedPokemon.set(pokemon);
       },
       error: (err) => {
-        // Clear selected pokemon on error to prevent showing stale data
-        this.state.selectedPokemon.set(null);
+        // No need to clear selectedPokemon here as it's cleared at the start
         this.state.error.set(err.message);
-      },
-      complete: () => this.state.loading.set(false),
+      }
     });
   }
 
@@ -165,6 +203,20 @@ export class PokemonStore {
     });
   }
 
+  loadEvolutionChain(pokemonName: string): void {
+    this.state.loadingEvolution.set(true);
+    this.state.evolutionError.set(null);
+    this.state.evolutionChain.set(null);
+
+    this.pokemonService.getPokemonSpecies(pokemonName).pipe(
+        mergeMap(species => this.pokemonService.getEvolutionChainByUrl(species.evolution_chain.url)),
+        finalize(() => this.state.loadingEvolution.set(false))
+    ).subscribe({
+        next: (chain) => this.state.evolutionChain.set(chain),
+        error: (err) => this.state.evolutionError.set(err.message),
+    });
+  }
+
   setSearchTerm(term: string): void {
     this.state.searchTerm.set(term);
     this.state.currentPage.set(1); // Reset to first page on new search
@@ -173,6 +225,11 @@ export class PokemonStore {
   setViewMode(mode: 'grid' | 'list'): void {
     this.state.viewMode.set(mode);
     this.state.selectedPokemon.set(null); // Clear on any view mode change for clean state
+  }
+
+  setSortOrder(order: SortOrder): void {
+    this.state.sortOrder.set(order);
+    this.state.currentPage.set(1);
   }
 
   setPokemonForComparison(pokemonName: string, slot: 1 | 2): void {

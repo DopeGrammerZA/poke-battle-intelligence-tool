@@ -58,7 +58,7 @@
             @if (i < 50) { <!-- Limit to first 50 for performance -->
               @let pokemonId = getPokemonId(p.pokemon.url);
               <a [routerLink]="['/pokemon', pokemonId]" class="group bg-slate-highlight/50 border border-transparent hover:border-neon-mint/50 rounded-lg p-4 flex flex-col items-center justify-center aspect-square transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-neon-mint/10" [attr.aria-label]="'View details for ' + p.pokemon.name">
-                <img [src]="'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/' + pokemonId + '.png'" [alt]="p.pokemon.name" class="w-20 h-20 object-contain transition-transform duration-300 group-hover:scale-110" loading="lazy" width="80" height="80" (error)="onImageError($event)">
+                <img [src]="'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/' + pokemonId + '.png'" [alt]="p.pokemon.name" class="w-20 h-20 object-contain transition-transform duration-300 group-hover:scale-110" [attr.loading]="$index < 6 ? 'eager' : 'lazy'" width="80" height="80" (error)="onImageError($event)">
                 <p class="mt-2 text-center text-sm font-semibold capitalize text-gray-300 group-hover:text-neon-mint transition-colors">{{ p.pokemon.name }}</p>
               </a>
             }

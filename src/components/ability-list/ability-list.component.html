@@ -1,0 +1,68 @@
+<div class="flex flex-col gap-8">
+  <!-- Search -->
+  <div class="relative w-full max-w-lg mx-auto">
+    <input 
+      type="text" 
+      placeholder="Search abilities (e.g., Levitate)..."
+      (input)="onSearch($event)"
+      [value]="store.searchTerm()"
+      class="w-full pl-10 pr-4 py-3 bg-slate-highlight border border-slate-700 rounded-lg focus:ring-2 focus:ring-neon-mint focus:outline-none transition-shadow"
+      aria-label="Search for an ability"
+    >
+    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+    </div>
+  </div>
+
+  @if (store.loading() && paginatedAbilities().length === 0) {
+    <!-- SKELETON -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+      @for (item of [1,2,3,4,5,6,7,8,9,10]; track item) {
+        <div class="animate-pulse-slow bg-slate-highlight/50 rounded-lg p-4 h-24 flex items-center justify-center">
+          <div class="h-4 w-3/4 bg-slate-700 rounded"></div>
+        </div>
+      }
+    </div>
+  } @else if (store.error()) {
+    <div class="text-center py-12 bg-red-900/50 border border-red-700 rounded-lg">
+      <p class="text-xl text-red-300 mb-4">Error: {{ store.error() }}</p>
+      <button (click)="retryLoad()" class="bg-neon-mint text-slate-deep font-bold py-2 px-6 rounded-lg hover:bg-opacity-80 transition-colors" aria-label="Retry loading ability list">
+        Retry
+      </button>
+    </div>
+  } @else {
+    <!-- ABILITY GRID -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+      @for (ability of paginatedAbilities(); track ability.name) {
+        <a [routerLink]="['/ability', ability.name]" class="group bg-slate-highlight/50 border border-transparent hover:border-neon-mint/50 rounded-lg p-4 h-24 flex items-center justify-center text-center transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-neon-mint/10" [attr.aria-label]="'View details for ' + ability.name">
+          <p class="font-semibold capitalize text-gray-300 group-hover:text-neon-mint transition-colors">{{ ability.name.replace('-', ' ') }}</p>
+        </a>
+      } @empty {
+        <div class="col-span-full text-center py-12 bg-slate-highlight/50 rounded-lg">
+          <p class="text-xl text-gray-400">No abilities found.</p>
+        </div>
+      }
+    </div>
+    
+    <!-- PAGINATION -->
+    @if (store.totalPages() > 1) {
+      <div class="flex justify-center items-center gap-1 sm:gap-2 mt-8 text-sm">
+        <button (click)="store.goToPage(store.currentPage() - 1)" [disabled]="store.currentPage() === 1" class="px-3 py-2 bg-slate-highlight border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" aria-label="Go to previous page">
+          &larr; Prev
+        </button>
+        @for(page of paginationRange(); track $index) {
+          @if (page === '...') {
+            <span class="px-2 sm:px-3 py-2 text-gray-400">...</span>
+          } @else {
+            <button (click)="store.goToPage(+page)" [class]="store.currentPage() === page ? 'bg-neon-mint text-slate-deep font-bold' : 'bg-slate-highlight border border-slate-700 hover:bg-slate-700'" class="w-10 h-10 rounded-lg transition-colors" [attr.aria-label]="'Go to page ' + page">
+              {{ page }}
+            </button>
+          }
+        }
+        <button (click)="store.goToPage(store.currentPage() + 1)" [disabled]="store.currentPage() === store.totalPages()" class="px-3 py-2 bg-slate-highlight border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" aria-label="Go to next page">
+          Next &rarr;
+        </button>
+      </div>
+    }
+  }
+</div>

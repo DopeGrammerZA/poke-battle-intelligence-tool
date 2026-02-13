@@ -8,7 +8,6 @@ import { PokemonListItem } from '../../models/pokemon.models';
 
 @Component({
   selector: 'app-pokemon-list',
-  standalone: true,
   imports: [CommonModule, RouterLink],
   templateUrl: './pokemon-list.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -56,6 +55,10 @@ export class PokemonListComponent implements OnInit, OnDestroy {
       // When the displayed list changes (e.g., search, page change), reset active index
       this.store.pokemonToDisplay(); 
       this.activeIndex.set(-1);
+      // Also reset selection in list view to prevent stale details on page change
+      if(this.store.viewMode() === 'list') {
+          this.selectedListItem.set(null);
+      }
     });
     
     effect(() => {
@@ -101,8 +104,9 @@ export class PokemonListComponent implements OnInit, OnDestroy {
     if (!target) return;
 
     const listSearchInputId = 'pokemon-list-internal-search';
+    const isSearchInput = ['pokemon-list-search', listSearchInputId, 'sort-order-select'].includes(target.id);
 
-    if ((target.id === 'pokemon-list-search' || target.id === listSearchInputId) && !['ArrowDown', 'ArrowUp', 'Tab', 'Enter', 'Escape', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+    if (isSearchInput && !['ArrowDown', 'ArrowUp', 'Tab', 'Enter', 'Escape', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
         this.isKeyboardNavActive.set(false);
         return;
     }
@@ -121,7 +125,7 @@ export class PokemonListComponent implements OnInit, OnDestroy {
     const targetId = target.id || '';
     const paginationButtons = this.getPaginationButtons();
     const isPaginationFocused = paginationButtons.some(btn => btn === target);
-    const isTopNavFocused = ['pokemon-list-search', 'grid-view-button', 'list-view-button'].includes(targetId);
+    const isTopNavFocused = ['pokemon-list-search', 'grid-view-button', 'list-view-button', 'sort-order-select'].includes(targetId);
 
     if (isTopNavFocused) {
         this.handleTopNav(event);
@@ -136,7 +140,7 @@ export class PokemonListComponent implements OnInit, OnDestroy {
 
   private handleTopNav(event: KeyboardEvent): void {
     const target = event.target as HTMLElement;
-    const topNavElements: string[] = ['pokemon-list-search', 'grid-view-button', 'list-view-button'];
+    const topNavElements: string[] = ['pokemon-list-search', 'sort-order-select', 'grid-view-button', 'list-view-button'];
     const currentIndex = topNavElements.indexOf(target.id);
 
     if (event.key === 'ArrowDown') {
@@ -296,6 +300,11 @@ export class PokemonListComponent implements OnInit, OnDestroy {
 
   onListSearch(event: Event) {
     this.listSearchTerm.set((event.target as HTMLInputElement).value);
+  }
+
+  onSortChange(event: Event) {
+    const sortOrder = (event.target as HTMLSelectElement).value as 'id-asc' | 'id-desc' | 'name-asc' | 'name-desc';
+    this.store.setSortOrder(sortOrder);
   }
 
   selectPokemon(pokemon: PokemonListItem): void {
